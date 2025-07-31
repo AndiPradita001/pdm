@@ -1,10 +1,25 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
+import re
+import warnings
+import string
+import random
+import math
 from wordcloud import WordCloud
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-import seaborn as sns
+from nltk.corpus import stopwords
+from sklearn.utils import resample
+
+warnings.filterwarnings("ignore", category=FutureWarning)
+try:
+    stop_words = set(stopwords.words('english'))
+except LookupError:
+    import nltk
+    nltk.download('stopwords')
+    stop_words = set(stopwords.words('english'))
 
 # Judul Aplikasi
 st.set_page_config(page_title="Sistem Deteksi Berita Palsu", layout="centered")
@@ -25,27 +40,33 @@ if st.button("Analisis Sekarang"):
 
 # Eksplorasi Dataset
 st.subheader("Eksplorasi Dataset")
-dataset = st.file_uploader("Unggah Dataset Sendiri (CSV)", type="csv")
+fake_file = st.file_uploader("Unggah File Fake.csv", type="csv")
+true_file = st.file_uploader("Unggah File True.csv", type="csv")
 
-if dataset:
-    df = pd.read_csv(dataset)
-    st.write("Contoh Data:", df.head())
+if fake_file and true_file:
+    fake_df = pd.read_csv(fake_file)
+    true_df = pd.read_csv(true_file)
+    fake_df['label'] = 'FAKE'
+    true_df['label'] = 'TRUE'
+    df = pd.concat([fake_df, true_df], ignore_index=True)
+    df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    df['text'] = df['title'] + ' ' + df['text']
+    st.write("Contoh Data:", df[['text', 'label']].head())
 
-    # TF-IDF dan WordCloud
+    # WordCloud
     st.markdown("### WordCloud Topik Fake vs True")
-    if 'label' in df.columns and 'text' in df.columns:
-        fake_text = " ".join(df[df['label'] == 'FAKE']['text'].dropna().values)
-        true_text = " ".join(df[df['label'] == 'TRUE']['text'].dropna().values)
+    fake_text = " ".join(df[df['label'] == 'FAKE']['text'].dropna().values)
+    true_text = " ".join(df[df['label'] == 'TRUE']['text'].dropna().values)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("Berita Palsu")
-            wc_fake = WordCloud(width=300, height=200, background_color='white').generate(fake_text)
-            st.image(wc_fake.to_array())
-        with col2:
-            st.write("Berita Asli")
-            wc_true = WordCloud(width=300, height=200, background_color='white').generate(true_text)
-            st.image(wc_true.to_array())
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("Berita Palsu")
+        wc_fake = WordCloud(width=300, height=200, background_color='white').generate(fake_text)
+        st.image(wc_fake.to_array())
+    with col2:
+        st.write("Berita Asli")
+        wc_true = WordCloud(width=300, height=200, background_color='white').generate(true_text)
+        st.image(wc_true.to_array())
 
     # Distribusi Panjang Teks
     st.markdown("### Distribusi Panjang Teks dan Label")
